@@ -1,0 +1,34 @@
+services:
+  # New Dedicated PostgreSQL for Airflow
+  airflow-db:
+    image: postgres:15
+    container_name: airflow-db
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+
+  # Airflow Webserver
+  webserver:
+    image: apache/airflow:latest
+    container_name: airflow-webserver
+    ports:
+      - "8080:8080"
+    command: bash -c "airflow db migrate && airflow api-server"
+    environment:
+      - AIRFLOW__CORE__EXECUTOR=LocalExecutor
+      # Note: We use the internal service name 'airflow-db' to connect
+      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@airflow-db:5432/airflow
+      - AIRFLOW__CORE__SIMPLE_AUTH_MANAGER_USERS=admin:admin,lordmufi:user
+      - AIRFLOW__CORE__LOAD_EXAMPLES=True
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    volumes:
+      - ./airflow:/opt/airflow
